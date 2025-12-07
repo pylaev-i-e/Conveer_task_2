@@ -1,71 +1,105 @@
+# Название workflow, отображается в GitHub UI
 name: Java CI
 
+# Триггеры запуска workflow
 on:
+  # Запускать при любом пуше в любую ветку
   push:
     branches: [ '**' ]
+  # Запускать при создании или обновлении pull request в любую ветку
   pull_request:
     branches: [ '**' ]
 
 jobs:
+  # Job: установка зависимостей
   install:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Используем Linux для установки
     steps:
+      # Шаг 1: Получить исходный код из репозитория
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      - name: Download dependencies
-        run: mvn dependency:go-offline --batch-mode
 
-  build:
-    needs: install
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+      # Шаг 2: Установить Java 17
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      # Шаг 3: Предзагрузить все зависимости Maven (для ускорения последующих шагов)
+      - name: Download dependencies
+        run: mvn dependency:go-offline --batch-mode  # --batch-mode — без интерактива
+
+  # Job: компиляция кода (зависит от успешного завершения install)
+  build:
+    needs: install  # Ждём завершения job 'install'
+    runs-on: ubuntu-latest
+    steps:
+      # Шаг 1: Получить исходный код из репозитория
+      - uses: actions/checkout@v4
+
+      # Шаг 2: Установить Java 17
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      # Компилируем исходный код без запуска тестов
       - name: Compile code
         run: mvn compile --batch-mode
 
+  # Job: запуск unit-тестов на нескольких ОС
   test:
+    # Матрица: запустить один и тот же job на разных ОС
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, macos-14]
-    runs-on: ${{ matrix.os }}
-    needs: install
+    runs-on: ${{ matrix.os }}  # Использовать ОС из матрицы
+    needs: install  # Зависит только от установки зависимостей (компиляция не обязательна, т.к. test включает compile)
     steps:
+      # Шаг 1: Получить исходный код из репозитория
       - uses: actions/checkout@v4
+
+      # Шаг 2: Установить Java 17
       - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'maven'
+          cache: 'maven'  # Кэшировать зависимости Maven между запусками
+      # Повторно загружаем зависимости (на случай, если кэш не сработал)
       - run: mvn dependency:go-offline --batch-mode
+      # Запускаем юнит-тесты (Maven автоматически выполнит compile перед test)
       - run: mvn test --batch-mode
 
+      # Публикуем результаты тестов ТОЛЬКО на Ubuntu, так как:
+      # - GitHub Actions не позволяет Docker-based action работать на Windows/macOS
+      # - check_run: false — отключает попытку создать Check Run (GITHUB_TOKEN не имеет на это прав)
+      # - job_summary: true — выводит красивый отчёт в интерфейсе GitHub Actions
       - name: Publish Test Results
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest'  # Только на Linux
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: "**/target/surefire-reports/TEST-*.xml"
           check_run: false
           job_summary: true
 
+  # Job: деплой на Heroku (только при пуше в ветку master)
   deploy:
+    # Запускать только если build и test завершились успешно
     needs: [build, test]
     runs-on: ubuntu-latest
+    # Условие: только при пуше (не при PR) и только в ветку master
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
+      # Получаем полную историю коммитов (не shallow clone), иначе Heroku отклонит push
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Полный клон репозитория
 
+      # Деплой через git push на Heroku
+      # Используем API-ключ, хранящийся в секретах репозитория
       - name: Deploy to Heroku via Git
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          # Добавляем Heroku как remote
+          # Принудительно пушим текущий HEAD в ветку main на Heroku
         run: |
           git remote add heroku https://heroku:${HEROKU_API_KEY}@git.heroku.com/conveer-task-2.git
           git push heroku HEAD:main -f
