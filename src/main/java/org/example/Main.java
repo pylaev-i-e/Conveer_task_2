@@ -12,7 +12,7 @@ public class Main {
     public static void main(String[] args) throws IOException {
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.createContext("/hello", exchange -> {
+        server.createContext("/", exchange -> {
             String query = Optional.ofNullable(exchange.getRequestURI().getQuery()).orElse("");
             String name = "незнакомец";
             if (query.startsWith("name=")) {

@@ -46,6 +46,12 @@ jobs:
       - run: mvn dependency:go-offline --batch-mode
       - run: mvn test --batch-mode
 
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: "**/target/surefire-reports/TEST-*.xml"
+
   deploy:
     needs: [build, test]
     runs-on: ubuntu-latest
