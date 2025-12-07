@@ -52,10 +52,10 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
-        
-      - name: Deploy to Heroku
-        uses: akhileshns/heroku-deploy@v3.12.12
-        with:
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: "conveer-task-2-b6f4ddedaed1"
-          heroku_email: "pylaev.i.e@gmail.com"
+
+      - name: Deploy to Heroku via Git
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          git remote add heroku https://heroku:${HEROKU_API_KEY}@git.heroku.com/conveer-task-2-b6f4ddedaed1.git
+          git push heroku HEAD:main -f
