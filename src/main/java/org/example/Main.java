@@ -1,3 +1,6 @@
+// Main.java
+package org.example;
+
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -16,6 +19,7 @@ public class Main {
                 name = query.substring(5);
             }
             String response = "Привет, " + name + "! Сегодня: " + LocalDate.now();
+            exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
             exchange.sendResponseHeaders(200, response.getBytes().length);
             OutputStream os = exchange.getResponseBody();
             os.write(response.getBytes());
