@@ -51,6 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
+      - uses: actions/checkout@v4
+        
       - name: Deploy to Heroku
         uses: akhileshns/heroku-deploy@v3.12.12
         with:
